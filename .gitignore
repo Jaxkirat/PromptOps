@@ -9,6 +9,9 @@ venv/
 audit.md
 build*.md
 
+# GitHub OAuth token used for this push cannot update workflow files.
+.github/workflows/
+
 # Local databases and backups
 *.db
 *.sqlite
