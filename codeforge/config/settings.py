@@ -36,6 +36,27 @@ class Settings:
     execution_timeout_seconds: int
     max_test_output_length: int
 
+    # R1: JWT authentication
+    jwt_secret_key: str
+    jwt_algorithm: str
+    access_token_expire_minutes: int
+
+    # R1: Persistence
+    database_url: str
+
+    # R1: Quotas
+    max_runs_per_user_per_day: int
+
+    # R1: API server
+    api_host: str
+    api_port: int
+    cors_allowed_origins: tuple[str, ...]
+
+    # R1: Instructor provisioning (trusted server-side configuration)
+    initial_instructor_email: str
+    initial_instructor_password: str
+    initial_instructor_name: str
+
     def resolve_api_key(self) -> str:
         """Return the API key for the configured provider.
 
@@ -78,4 +99,20 @@ def get_settings() -> Settings:
         log_level=os.getenv("LOG_LEVEL", "INFO").strip() or "INFO",
         execution_timeout_seconds=_int_env("EXECUTION_TIMEOUT_SECONDS", 15),
         max_test_output_length=_int_env("MAX_TEST_OUTPUT_LENGTH", 10000),
+        jwt_secret_key=os.getenv("JWT_SECRET_KEY", "").strip(),
+        jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256").strip() or "HS256",
+        access_token_expire_minutes=_int_env("ACCESS_TOKEN_EXPIRE_MINUTES", 30),
+        database_url=os.getenv("DATABASE_URL", "sqlite:///./codeforge.db").strip()
+        or "sqlite:///./codeforge.db",
+        max_runs_per_user_per_day=_int_env("MAX_RUNS_PER_USER_PER_DAY", 20),
+        api_host=os.getenv("API_HOST", "127.0.0.1").strip() or "127.0.0.1",
+        api_port=_int_env("API_PORT", 8000),
+        cors_allowed_origins=tuple(
+            origin.strip()
+            for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:7860").split(",")
+            if origin.strip()
+        ),
+        initial_instructor_email=os.getenv("INITIAL_INSTRUCTOR_EMAIL", "").strip(),
+        initial_instructor_password=os.getenv("INITIAL_INSTRUCTOR_PASSWORD", "").strip(),
+        initial_instructor_name=os.getenv("INITIAL_INSTRUCTOR_NAME", "").strip(),
     )

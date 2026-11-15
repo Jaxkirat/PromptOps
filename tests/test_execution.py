@@ -21,6 +21,17 @@ def _settings(timeout: int = 30) -> Settings:
         log_level="INFO",
         execution_timeout_seconds=timeout,
         max_test_output_length=10000,
+        jwt_secret_key="",
+        jwt_algorithm="HS256",
+        access_token_expire_minutes=30,
+        database_url="sqlite:///:memory:",
+        max_runs_per_user_per_day=20,
+        api_host="127.0.0.1",
+        api_port=8000,
+        cors_allowed_origins=(),
+        initial_instructor_email="",
+        initial_instructor_password="",
+        initial_instructor_name="",
     )
 
 

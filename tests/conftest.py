@@ -212,6 +212,117 @@ def test_output() -> TestOutput:
     )
 
 
+# ---------------------------------------------------------------------------
+# R1 (Phase 2) fixtures: isolated test database, app factory, fake pipeline.
+# ---------------------------------------------------------------------------
+
+TEST_JWT_SECRET = "unit-test-jwt-secret-key-0123456789-abcdefghijklmnop"
+
+
+class FakePipeline:
+    """Deterministic stand-in for the LangGraph pipeline.
+
+    Records every input it receives so tests can verify that ONLY sanitized
+    text ever reaches the pipeline/LLM, and counts invocations so quota tests
+    can prove the graph is never called after a rejection.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def __call__(self, text: str) -> dict:
+        from codeforge.models.schemas import ExecutionResult, FinalReport
+
+        self.calls.append(text)
+        report = FinalReport(
+            user_request=text,
+            status="success",
+            status_detail="All 3 generated tests passed in actual pytest execution.",
+            task_type="python",
+            language="python",
+            code=CodeOutput(language="python", code="def solution():\n    return 42\n"),
+            tests=TestOutput(
+                language="python",
+                test_framework="pytest",
+                test_code="from solution import solution\n\ndef test_solution():\n    assert solution() == 42\n",
+            ),
+            execution=ExecutionResult(
+                status="passed",
+                exit_code=0,
+                total_tests=3,
+                passed_tests=3,
+                failed_tests=0,
+                execution_time_seconds=0.1,
+            ),
+            generation_successful=True,
+            execution_successful=True,
+            tests_passed=True,
+        )
+        return {"user_request": text, "report": report}
+
+
+@pytest.fixture
+def api_env(tmp_path, monkeypatch):
+    """Isolated settings + temporary database for R1 tests."""
+    from codeforge.config.settings import get_settings
+    from codeforge.database.database import init_db, reset_database_state
+
+    db_path = tmp_path / "test_codeforge.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("JWT_SECRET_KEY", TEST_JWT_SECRET)
+    monkeypatch.setenv("JWT_ALGORITHM", "HS256")
+    monkeypatch.setenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+    monkeypatch.setenv("MAX_RUNS_PER_USER_PER_DAY", "20")
+    monkeypatch.setenv("INITIAL_INSTRUCTOR_EMAIL", "")
+    monkeypatch.setenv("INITIAL_INSTRUCTOR_PASSWORD", "")
+    get_settings.cache_clear()
+    reset_database_state()
+    init_db()
+    yield
+    reset_database_state()
+    get_settings.cache_clear()
+
+
+@pytest.fixture
+def fake_pipeline(api_env):
+    """Install a recording fake pipeline for the duration of a test."""
+    from codeforge.services.run_service import set_pipeline_runner
+
+    pipeline = FakePipeline()
+    set_pipeline_runner(pipeline)
+    yield pipeline
+    set_pipeline_runner(None)
+
+
+@pytest.fixture
+def client(api_env, fake_pipeline):
+    """FastAPI TestClient over a freshly assembled application."""
+    from fastapi.testclient import TestClient
+
+    from codeforge.api.main import create_application
+
+    with TestClient(create_application()) as test_client:
+        yield test_client
+
+
+def register_and_login(client, email: str, password: str = "StrongPassword123") -> str:
+    """Helper: register a student and return a bearer token."""
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": password, "full_name": "Test User"},
+    )
+    assert response.status_code == 201, response.text
+    response = client.post(
+        "/api/v1/auth/login", json={"email": email, "password": password}
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["access_token"]
+
+
+def auth_header(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
 @pytest.fixture
 def fake_llm_full_pipeline(
     router_python_output: RouterOutput,
