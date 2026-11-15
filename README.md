@@ -12,6 +12,13 @@ Multi-agent **Natural Language → Code** platform: classify a request, extract 
 
 ---
 
+## Agent Architecture Diagram
+
+
+<img width="2720" height="3160" alt="agentic_workflow_flowchart" src="https://github.com/user-attachments/assets/79cd3842-7556-466a-83f7-c8a488557030" />
+
+
+
 ## Launch (step by step)
 
 ### 1. Clone and enter the repo
