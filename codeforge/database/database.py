@@ -9,11 +9,12 @@ PostgreSQL migration only requires a URL change.
 from __future__ import annotations
 
 import logging
+import sqlite3
 import threading
 from contextlib import contextmanager
 from typing import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -24,6 +25,16 @@ logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
+
+
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record) -> None:
+    """SQLite ignores foreign keys unless each connection turns them on."""
+    del connection_record
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 _lock = threading.Lock()
@@ -68,10 +79,31 @@ def session_scope() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Create all tables (idempotent)."""
+    """Create all tables (idempotent) and apply lightweight SQLite column adds."""
     import codeforge.database.models  # noqa: F401 - register models on Base
 
-    Base.metadata.create_all(get_engine())
+    engine = get_engine()
+    from codeforge.database.migrate import apply_schema_updates, backup_development_database
+
+    backup_development_database(engine)
+    Base.metadata.create_all(engine)
+    apply_schema_updates(engine)
+    _ensure_sqlite_columns(engine)
+
+
+def _ensure_sqlite_columns(engine: Engine) -> None:
+    """Add columns introduced after the initial schema without a full migrator."""
+    if engine.dialect.name != "sqlite":
+        return
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "runs" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("runs")}
+    if "artifacts_json" not in existing:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE runs ADD COLUMN artifacts_json TEXT"))
 
 
 def reset_database_state() -> None:

@@ -23,7 +23,7 @@ class _FakeStructuredRunnable:
     def __init__(self, response: Any) -> None:
         self._response = response
 
-    def invoke(self, _input: Any) -> Any:
+    def invoke(self, _input: Any, **_kwargs: Any) -> Any:
         if isinstance(self._response, Exception):
             raise self._response
         return self._response
@@ -240,7 +240,29 @@ class FakePipeline:
             status_detail="All 3 generated tests passed in actual pytest execution.",
             task_type="python",
             language="python",
-            code=CodeOutput(language="python", code="def solution():\n    return 42\n"),
+            router_output=RouterOutput(
+                task_type="python",
+                language="python",
+                description="Python function generation request.",
+                confidence=0.97,
+                reasoning="Clearly a Python coding task.",
+            ),
+            requirements=RequirementsOutput(
+                task_type="python",
+                language="python",
+                function_name="solution",
+                description="Return 42.",
+                parameters=[ParameterSpec(name="value", data_type="object", description="input")],
+                return_type="int",
+                expected_behavior=["returns 42"],
+                edge_cases=[],
+                constraints=[],
+            ),
+            code=CodeOutput(
+                language="python",
+                code="def solution():\n    return 42\n",
+                explanation="Constant function used by the test double.",
+            ),
             tests=TestOutput(
                 language="python",
                 test_framework="pytest",
@@ -253,6 +275,8 @@ class FakePipeline:
                 passed_tests=3,
                 failed_tests=0,
                 execution_time_seconds=0.1,
+                stdout="3 passed",
+                stderr="",
             ),
             generation_successful=True,
             execution_successful=True,
@@ -321,6 +345,35 @@ def register_and_login(client, email: str, password: str = "StrongPassword123") 
 
 def auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(autouse=True)
+def r2_execution_defaults(monkeypatch, tmp_path):
+    """Keep the existing suite on an explicit non-isolating backend.
+
+    Production default remains Docker, which fails closed when the daemon is
+    down. These tests opt into restricted-process so safe canned code still
+    runs pytest. Approval-class code is refused by that backend.
+    """
+    from codeforge.config.settings import get_settings
+    from codeforge.graph import workflow as workflow_module
+
+    monkeypatch.setenv("CODEFORGE_SANDBOX_BACKEND", "restricted-process")
+    monkeypatch.setenv("CODEFORGE_CHECKPOINT_PATH", str(tmp_path / "checkpoints.sqlite"))
+    get_settings.cache_clear()
+    workflow_module._checkpointer = None
+    workflow_module._checkpointer_path = None
+    from codeforge.sql_agent.proposer import set_sql_proposer
+    from codeforge.sql_agent.tickets import set_ticket_access
+
+    set_sql_proposer(None)
+    set_ticket_access(None)
+    yield
+    set_sql_proposer(None)
+    set_ticket_access(None)
+    get_settings.cache_clear()
+    workflow_module._checkpointer = None
+    workflow_module._checkpointer_path = None
 
 
 @pytest.fixture

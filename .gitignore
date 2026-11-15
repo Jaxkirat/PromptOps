@@ -1,11 +1,19 @@
-# Environments
+# Environments and secrets
 .venv/
 venv/
 .env
+.env.*
+!.env.example
 
-# Local databases
+# Local notes that should not be deployed
+audit.md
+build*.md
+
+# Local databases and backups
 *.db
+*.sqlite
 *.sqlite3
+*.bak
 
 # Python artifacts
 __pycache__/
@@ -13,6 +21,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+artifacts/
 
 # Tooling caches
 .pytest_cache/
@@ -23,3 +32,6 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+
+# Vendored third-party repos
+brag/

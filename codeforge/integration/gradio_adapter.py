@@ -86,3 +86,52 @@ class GradioSessionAdapter:
     def my_quota(self) -> QuotaStatus:
         with services.authenticated_context(self._require_token()):
             return services.get_my_quota()
+
+    def pending_approvals(self) -> list[dict]:
+        with services.authenticated_context(self._require_token()):
+            from codeforge.services.approval_service import list_pending
+
+            return list_pending()
+
+    def decide_approval(self, approval_id: str, decision: str) -> dict:
+        with services.authenticated_context(self._require_token()):
+            from codeforge.services.approval_service import decide
+
+            return decide(approval_id, decision)
+
+    def submit_feedback(self, run_id: str, vote: str, explanation: str = "") -> dict:
+        with services.authenticated_context(self._require_token()):
+            from codeforge.services.feedback_service import submit_feedback
+
+            record = submit_feedback(run_id, vote, explanation)
+            return record.model_dump(mode="json")
+
+    def ask_sql(self, question: str, ticket_id: str | None = None):
+        """Ask the read-only SQL agent. The token, not the caller, supplies identity."""
+        with services.authenticated_context(self._require_token()):
+            from codeforge.sql_agent.service import ask_sql
+
+            return ask_sql(question, ticket_id)
+
+    def sql_tickets(self) -> dict:
+        with services.authenticated_context(self._require_token()):
+            from codeforge.sql_agent.service import list_ticket_overview
+
+            return list_ticket_overview()
+
+    def sql_ticket(self, ticket_id: str) -> dict:
+        with services.authenticated_context(self._require_token()):
+            from codeforge.sql_agent.service import ticket_context
+
+            return ticket_context(ticket_id)
+
+    def preview_invitation(self, token: str):
+        """Inspect an invitation (no authentication required)."""
+        return services.preview_invitation(token)
+
+    def accept_invitation(
+        self, token: str, email: str, password: str, full_name: str
+    ) -> UserProfile:
+        """Activate an instructor invite, then log the new instructor in."""
+        profile = services.activate_invitation(token, email, password, full_name)
+        return self.login(email, password)

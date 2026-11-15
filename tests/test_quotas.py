@@ -63,12 +63,11 @@ class TestQuotaEnforcement:
         with TestClient(create_application()) as client:
             token = register_and_login(client, "quota-view@example.com")
             quota = client.get("/api/v1/users/me/quota", headers=auth_header(token)).json()
-            assert quota == {
-                "limit": 3,
-                "used": 0,
-                "remaining": 3,
-                "utc_date": datetime.now(timezone.utc).date().isoformat(),
-            }
+            assert quota["limit"] == 3
+            assert quota["used"] == 0
+            assert quota["remaining"] == 3
+            assert quota["utc_date"] == datetime.now(timezone.utc).date().isoformat()
+            assert quota["resets_at"]
 
             client.post("/api/v1/runs", json={"request": "one"}, headers=auth_header(token))
             quota = client.get("/api/v1/users/me/quota", headers=auth_header(token)).json()

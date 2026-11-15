@@ -1,0 +1,14 @@
+[
+  {"left": "Write a Python function that checks a palindrome.", "right": "write a python function that checks a palindrome", "language": "python", "match": true},
+  {"left": "Write a Python function that returns the factorial of n.", "right": "Write a Python function that returns the factorial of n", "language": "python", "match": true},
+  {"left": "Write a Python function that finds duplicate values.", "right": "write a python function that finds duplicate values.", "language": "python", "match": true},
+  {"left": "Sort a list ascending.", "right": "Sort a list descending.", "language": "python", "match": false},
+  {"left": "Return a list of unique names.", "right": "Return a set of unique names.", "language": "python", "match": false},
+  {"left": "Use a recursive factorial.", "right": "Use an iterative factorial.", "language": "python", "match": false},
+  {"left": "Sort the items in-place.", "right": "Sort the items into a new-list.", "language": "python", "match": false},
+  {"left": "Compare case-sensitive text.", "right": "Compare case-insensitive text.", "language": "python", "match": false},
+  {"left": "Write a Python function that adds two numbers.", "right": "Write a JavaScript function that adds two numbers.", "language": "python", "match": false},
+  {"left": "Keep duplicates in the result.", "right": "Return only unique values.", "language": "python", "match": false},
+  {"left": "The solution must be O(n).", "right": "The solution may be unrestricted.", "language": "python", "match": false},
+  {"left": "Write a Python function that clamps a number.", "right": "Write a Python function that clamps a number.", "language": "python", "match": true}
+]

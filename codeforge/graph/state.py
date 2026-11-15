@@ -24,12 +24,23 @@ class CodeForgeState(TypedDict, total=False):
 
     # Input
     user_request: str
+    user_id: str
+    thread_id: str
 
     # Agent outputs
     router_output: Optional[RouterOutput]
     requirements_output: Optional[RequirementsOutput]
     code_output: Optional[CodeOutput]
     test_output: Optional[TestOutput]
+
+    # R2 policy, approval and idempotency
+    policy_result: Optional[dict]
+    policy_decision: Optional[str]
+    approval_required: bool
+    approval_status: Optional[str]
+    approval_actor_id: Optional[str]
+    idempotency_key: Optional[str]
+    idempotency_hit: bool
 
     # Execution and reporting
     execution_result: Optional[ExecutionResult]

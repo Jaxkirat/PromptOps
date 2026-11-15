@@ -19,6 +19,7 @@ class RunSubmitRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     request: str = Field(min_length=1, max_length=8000, description="Natural-language coding request.")
+    conversation_id: str | None = Field(default=None, max_length=64)
 
 
 class RunListResponse(BaseModel):

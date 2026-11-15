@@ -41,7 +41,13 @@ def build_report(state: Mapping[str, Any]) -> FinalReport:
 
     generation_successful = code is not None and tests is not None
     execution_successful = execution is not None and execution.status in ("passed", "failed")
-    tests_passed = execution is not None and execution.status == "passed"
+    tests_passed = (
+        execution is not None
+        and execution.status == "passed"
+        and execution.executed
+        and execution.exit_code == 0
+        and execution.total_tests > 0
+    )
 
     status: str
     detail: str
@@ -76,11 +82,26 @@ def build_report(state: Mapping[str, Any]) -> FinalReport:
             f"Code and tests were generated, but {execution.failed_tests} of "
             f"{execution.total_tests} tests failed in actual pytest execution."
         )
-    else:
+    elif execution.status == "denied":
+        status = "denied"
+        detail = execution.error_message or "Execution blocked by CodeForge security policy."
+    elif execution.status == "awaiting_approval":
+        status = "awaiting_approval"
+        detail = execution.error_message or "Execution paused: human approval required."
+    elif execution.status == "rejected":
+        status = "rejected"
+        detail = execution.error_message or "Execution was rejected and was not run."
+    elif execution.status == "unavailable":
+        status = "unavailable"
+        detail = execution.error_message or "Sandbox unavailable. Code was not executed."
+    elif execution.status == "passed" and execution.executed and execution.exit_code == 0:
         status = "success"
         detail = (
             f"All {execution.passed_tests} generated tests passed in actual pytest execution."
         )
+    else:
+        status = "execution_error"
+        detail = execution.error_message or "Execution did not produce a passing pytest result."
 
     return FinalReport(
         user_request=user_request,

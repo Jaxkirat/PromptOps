@@ -46,48 +46,71 @@ def validate_llm_config(settings: Settings | None = None) -> None:
         raise ConfigurationError("LLM_MODEL must not be empty.")
 
 
-def create_llm(settings: Settings | None = None) -> BaseChatModel:
-    """Create the chat model configured via environment variables.
+def _openai_model(model: str, api_key: str, base_url: str = "") -> BaseChatModel:
+    from langchain_openai import ChatOpenAI
 
-    Only the selected provider's credentials are required. The returned model
-    is deterministic (temperature 0) because the pipeline needs reproducible
-    structured outputs.
+    kwargs: dict = {"model": model, "api_key": api_key, "temperature": 0}
+    if base_url:
+        kwargs["base_url"] = base_url
+    return ChatOpenAI(**kwargs)
+
+
+def _provider_chain(settings: Settings) -> list[tuple[str, str, BaseChatModel]]:
+    """Primary model first, then configured fallbacks that have their own credentials."""
+    validate_llm_config(settings)
+    primary_key = settings.resolve_api_key()
+    primary_model = settings.groq_model or settings.llm_model
+    base_url = settings.llm_base_url
+    if settings.primary_llm_provider == "groq" and settings.groq_api_key:
+        primary_key = settings.groq_api_key
+        base_url = base_url or "https://api.groq.com/openai/v1"
+    primary_name = "groq" if "groq" in base_url or settings.primary_llm_provider == "groq" else settings.llm_provider.lower()
+    if primary_name == "openai" and "groq" not in base_url:
+        chain = [("openai", settings.llm_model, _openai_model(settings.llm_model, primary_key, base_url))]
+    elif primary_name in {"anthropic", "google"} and settings.primary_llm_provider not in {"", "groq"}:
+        chain = [(primary_name, settings.llm_model, _build_named(settings, primary_name, settings.llm_model, primary_key, base_url))]
+    else:
+        chain = [(primary_name, primary_model, _openai_model(primary_model, primary_key, base_url))]
+    if (
+        settings.fallback_1_provider == "openai"
+        and settings.openai_api_key
+        and not any(name == "openai" and not settings.llm_base_url for name, _model, _client in chain)
+    ):
+        chain.append(("openai", settings.openai_model, _openai_model(settings.openai_model, settings.openai_api_key)))
+    if settings.fallback_2_provider and settings.fallback_2_api_key and settings.fallback_2_model:
+        chain.append(
+            (
+                settings.fallback_2_provider,
+                settings.fallback_2_model,
+                _openai_model(settings.fallback_2_model, settings.fallback_2_api_key),
+            )
+        )
+    logger.info("provider_chain=%s", [name for name, _model, _client in chain])
+    return chain
+
+
+def _build_named(settings: Settings, provider: str, model: str, api_key: str, base_url: str) -> BaseChatModel:
+    del settings
+    if provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
+        return ChatAnthropic(model=model, api_key=api_key, temperature=0)
+    if provider == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(model=model, google_api_key=api_key, temperature=0)
+    return _openai_model(model, api_key, base_url)
+
+
+def create_llm(settings: Settings | None = None):
+    """Create the configured model, with retries and fallbacks when more than one provider is set.
+
+    A single configured provider is returned directly so existing callers keep the same client.
     """
     settings = settings or get_settings()
-    validate_llm_config(settings)
+    chain = _provider_chain(settings)
+    if len(chain) == 1 and not settings.chaos_enabled:
+        return chain[0][2]
+    from codeforge.resilience.fallback import ResilientChatModel
 
-    provider = settings.llm_provider.lower()
-    api_key = settings.resolve_api_key()
-    logger.info("Initialising LLM provider=%s model=%s", provider, settings.llm_model)
-
-    if provider == "openai":
-        from langchain_openai import ChatOpenAI
-
-        kwargs: dict = {"model": settings.llm_model, "api_key": api_key, "temperature": 0}
-        if settings.llm_base_url:
-            kwargs["base_url"] = settings.llm_base_url
-        return ChatOpenAI(**kwargs)
-
-    if provider == "anthropic":
-        try:
-            from langchain_anthropic import ChatAnthropic
-        except ImportError as exc:  # pragma: no cover - optional dependency
-            raise ConfigurationError(
-                "Provider 'anthropic' requires the langchain-anthropic package. "
-                "Install it with: pip install langchain-anthropic"
-            ) from exc
-        return ChatAnthropic(model=settings.llm_model, api_key=api_key, temperature=0)
-
-    if provider == "google":
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-        except ImportError as exc:  # pragma: no cover - optional dependency
-            raise ConfigurationError(
-                "Provider 'google' requires the langchain-google-genai package. "
-                "Install it with: pip install langchain-google-genai"
-            ) from exc
-        return ChatGoogleGenerativeAI(
-            model=settings.llm_model, google_api_key=api_key, temperature=0
-        )
-
-    raise ConfigurationError(f"Unsupported LLM provider: {provider}")  # pragma: no cover
+    return ResilientChatModel(chain, settings)

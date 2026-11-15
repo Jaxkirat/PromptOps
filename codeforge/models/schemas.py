@@ -106,7 +106,17 @@ class TestOutput(BaseModel):
         return strip_markdown_fences(value)
 
 
-ExecutionStatus = Literal["passed", "failed", "timeout", "error", "not_run"]
+ExecutionStatus = Literal[
+    "passed",
+    "failed",
+    "timeout",
+    "error",
+    "not_run",
+    "denied",
+    "awaiting_approval",
+    "rejected",
+    "unavailable",
+]
 
 
 class ExecutionResult(BaseModel):
@@ -123,6 +133,14 @@ class ExecutionResult(BaseModel):
     execution_time_seconds: float = Field(default=0.0, ge=0.0)
     timed_out: bool = Field(default=False)
     error_message: Optional[str] = Field(default=None)
+    policy_decision: Optional[str] = Field(default=None)
+    policy_reasons: list[str] = Field(default_factory=list)
+    approval_status: Optional[str] = Field(default=None)
+    sandbox_backend: Optional[str] = Field(default=None)
+    network_isolated: Optional[bool] = Field(default=None)
+    filesystem_isolated: Optional[bool] = Field(default=None)
+    idempotency_status: Optional[str] = Field(default=None)
+    executed: bool = Field(default=False)
 
 
 ReportStatus = Literal[
@@ -132,6 +150,10 @@ ReportStatus = Literal[
     "execution_error",
     "generation_error",
     "unsupported",
+    "denied",
+    "awaiting_approval",
+    "rejected",
+    "unavailable",
 ]
 
 

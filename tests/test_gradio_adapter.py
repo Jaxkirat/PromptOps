@@ -129,7 +129,9 @@ class TestConcurrentSessions:
         signature = inspect.signature(create_application)
         assert "include_gradio" in signature.parameters
         assert "mount_gradio_app" in inspect.getdoc(create_application)
+        from fastapi.testclient import TestClient
 
-        # The guard prevents premature mounting of an unfinished UI.
-        with pytest.raises(NotImplementedError):
-            create_application(include_gradio=True)
+        app = create_application(include_gradio=False)
+        with TestClient(app) as client:
+            assert client.get("/docs").status_code == 200
+            assert client.get("/openapi.json").status_code == 200

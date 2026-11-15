@@ -17,7 +17,7 @@ class TestFullApiFlow:
         # Submit a run.
         created = client.post(
             "/api/v1/runs",
-            json={"request": "Write a palindrome checker"},
+            json={"request": "Write a function that returns 42 for the caller"},
             headers=auth_header(token),
         )
         assert created.status_code == 201

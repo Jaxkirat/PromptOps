@@ -6,6 +6,9 @@ from fastapi import APIRouter, Depends, status
 
 from codeforge.api.dependencies import get_bearer_token, get_current_principal
 from codeforge.api.schemas.auth import (
+    InvitationAcceptRequest,
+    InvitationPreviewResponse,
+    InvitationValidateRequest,
     LoginRequest,
     MessageResponse,
     RegisterRequest,
@@ -13,6 +16,7 @@ from codeforge.api.schemas.auth import (
 )
 from codeforge.auth.identity import AuthenticatedPrincipal
 from codeforge.services import auth_service
+from codeforge.services.invitation_service import accept_invitation, validate_invitation
 from codeforge.services.user_service import UserProfile, get_current_profile, profile_from_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -49,3 +53,30 @@ def logout(
 @router.get("/me", response_model=UserProfile)
 def me(_principal: AuthenticatedPrincipal = Depends(get_current_principal)) -> UserProfile:
     return get_current_profile()
+
+
+@router.post("/invitations/validate", response_model=InvitationPreviewResponse)
+def validate_instructor_invitation(payload: InvitationValidateRequest) -> InvitationPreviewResponse:
+    """Inspect a pending instructor invitation. Does not consume it."""
+    preview = validate_invitation(payload.token)
+    return InvitationPreviewResponse(
+        email=preview.email,
+        expires_at=preview.expires_at.isoformat(),
+        status=preview.status,
+    )
+
+
+@router.post(
+    "/invitations/accept",
+    response_model=UserProfile,
+    status_code=status.HTTP_201_CREATED,
+)
+def accept_instructor_invitation(payload: InvitationAcceptRequest) -> UserProfile:
+    """Activate an instructor invitation. Role is assigned by the server."""
+    user = accept_invitation(
+        token=payload.token,
+        email=payload.email,
+        password=payload.password,
+        full_name=payload.full_name,
+    )
+    return profile_from_user(user)

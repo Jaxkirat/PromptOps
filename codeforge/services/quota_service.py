@@ -8,7 +8,7 @@ transaction, so concurrent requests cannot exceed the configured limit.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from pydantic import BaseModel
 from sqlalchemy import insert, update
@@ -30,6 +30,7 @@ class QuotaStatus(BaseModel):
     used: int
     remaining: int
     utc_date: str
+    resets_at: str
 
 
 def _utc_today():
@@ -90,6 +91,13 @@ def get_my_quota() -> QuotaStatus:
             .one_or_none()
         )
         used = row.reserved_count if row is not None else 0
+    resets_at = datetime.combine(
+        today + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+    )
     return QuotaStatus(
-        limit=limit, used=used, remaining=max(limit - used, 0), utc_date=today.isoformat()
+        limit=limit,
+        used=used,
+        remaining=max(limit - used, 0),
+        utc_date=today.isoformat(),
+        resets_at=resets_at.isoformat(),
     )

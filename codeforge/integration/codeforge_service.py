@@ -23,6 +23,11 @@ from codeforge.services.auth_service import (
     provision_instructor,
     register_student,
 )
+from codeforge.services.invitation_service import (
+    InvitationPreview,
+    accept_invitation,
+    validate_invitation,
+)
 from codeforge.services.quota_service import QuotaStatus, get_my_quota
 from codeforge.services.run_service import (
     RunRecord,
@@ -63,6 +68,16 @@ def logout(access_token: str) -> None:
     logout_user(access_token)
 
 
+def preview_invitation(token: str) -> InvitationPreview:
+    """Validate an instructor invitation without consuming it."""
+    return validate_invitation(token)
+
+
+def activate_invitation(token: str, email: str, password: str, full_name: str) -> UserProfile:
+    """Consume an invitation and create an instructor account (server-assigned role)."""
+    return profile_from_user(accept_invitation(token, email, password, full_name))
+
+
 __all__ = [
     "authenticated_context",
     "register_user",
@@ -75,7 +90,10 @@ __all__ = [
     "get_run",
     "get_my_quota",
     "set_pipeline_runner",
+    "preview_invitation",
+    "activate_invitation",
     "QuotaStatus",
     "RunRecord",
     "UserProfile",
+    "InvitationPreview",
 ]
