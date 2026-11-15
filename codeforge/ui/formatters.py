@@ -97,10 +97,6 @@ def assistant_message(run: RunRecord) -> str:
                 lines.append("This is not a success — inspect the Tests and Execution tabs.")
         lines.append("\nOpen the **Code**, **Tests**, **Requirements** and **Execution** tabs for artifacts.")
 
-    lines.append(
-        "\n_Execution uses a development-grade subprocess runner. "
-        "The R2 security sandbox is not implemented yet._"
-    )
     return "\n".join(lines)
 
 
@@ -270,24 +266,6 @@ def profile_html(profile: UserProfile | None) -> str:
     )
 
 
-def roadmap_html() -> str:
-    live = [
-        ("Level 1 pipeline", "live"),
-        ("R1 Identity & Privacy", "live"),
-        ("Gradio workspace", "live"),
-        ("R2 Safe Execution", "live"),
-        ("R6 Evaluation Gate", "live"),
-        ("R7 Safe SQL Agent", "live"),
-    ]
-    next_up = [
-        ("R3 Escalation", "next"),
-        ("R4 Cost & Latency", "next"),
-        ("R5 Resilience", "next"),
-    ]
-    items = "".join(_roadmap_item(label, state) for label, state in live + next_up)
-    return f'<div class="roadmap"><div class="roadmap-title">Roadmap</div>{items}</div>'
-
-
 def empty_code() -> str:
     return "# No generated code for this run.\n# Unsupported or failed generations leave this empty on purpose.\n"
 
@@ -414,14 +392,6 @@ def ticket_context_markdown(payload: dict | None, error: str = "") -> str:
             lines.append(code)
             lines.append("```")
     return "\n".join(lines)
-
-
-def _roadmap_item(label: str, state: str) -> str:
-    tag = "Live" if state == "live" else "Upcoming"
-    return (
-        f'<div class="roadmap-item {state}">'
-        f"<span>{escape(label)}</span><span class='tag'>{tag}</span></div>"
-    )
 
 
 def _format_dt(value: datetime) -> str:

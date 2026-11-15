@@ -15,10 +15,29 @@ _HUMAN = re.compile(
     re.IGNORECASE,
 )
 _ANGRY = re.compile(r"\b(unacceptable|furious|angry|ridiculous)\b", re.IGNORECASE)
+_COMPLAINT = re.compile(
+    r"(not working|isn't working|isnt working|doesn't work|does not work|broken)",
+    re.IGNORECASE,
+)
 _NEGATIVE = re.compile(
     r"(not quite|isn't quite|isnt quite|still not|not what i|did not work|didn't work|not getting)",
     re.IGNORECASE,
 )
+
+
+def _shouted(text: str) -> bool:
+    letters = [character for character in text if character.isalpha()]
+    if len(letters) < 12:
+        return False
+    uppercase = sum(character.isupper() for character in letters)
+    return uppercase / len(letters) >= 0.7
+
+
+def _is_angry(text: str) -> bool:
+    if _ANGRY.search(text):
+        return True
+    exclaimed = text.count("!") >= 2
+    return exclaimed and (_shouted(text) or bool(_COMPLAINT.search(text)))
 
 
 class TriageResult(BaseModel):
@@ -31,8 +50,9 @@ class TriageResult(BaseModel):
 
 def triage_text(text: str) -> TriageResult:
     """Deterministic triage used when a live model call is not requested."""
-    wants_human = bool(_HUMAN.search(text or ""))
-    if _ANGRY.search(text or ""):
+    raw = text or ""
+    wants_human = bool(_HUMAN.search(raw))
+    if _is_angry(raw):
         sentiment: Sentiment = "angry"
         urgency = 5
     elif _NEGATIVE.search(text or ""):

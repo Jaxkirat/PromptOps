@@ -1,12 +1,8 @@
-"""Sandboxed pytest execution.
+"""Pytest execution for policy-allow code.
 
-Docker is the only backend that claims network and filesystem isolation.
-``restricted-process`` is an explicit opt-in for safe (policy-allow) code when
-Docker is unavailable. It strips the parent environment and enforces an
-external timeout, but it does **not** block network or host filesystem access.
-Approval-class code is refused on that backend (fail closed).
-
-The Phase 1 ``PytestRunner`` is not called from this module.
+The runner strips the parent environment and enforces an external timeout.
+It does not block network or host filesystem access, so approval-class code
+is refused. Docker is not used.
 """
 
 from __future__ import annotations
@@ -42,103 +38,19 @@ def run_sandbox(
 ) -> ExecutionResult:
     """Execute pytest under the configured sandbox backend, or fail closed."""
     settings = settings or get_settings()
-    backend = settings.sandbox_backend.strip().lower()
     approval_class = policy.decision == "needs_approval" or approved
-
-    if backend == "docker":
-        return _run_docker(code, tests, settings, approval_class)
-    if backend == "restricted-process":
-        if approval_class:
-            return _unavailable(
-                "restricted-process cannot confine filesystem or network access. "
-                "Refusing to execute approval-class code. Start Docker and set "
-                "CODEFORGE_SANDBOX_BACKEND=docker."
-            )
-        return _run_restricted_process(code, tests, settings)
-    return _unavailable(
-        f"Unknown sandbox backend '{settings.sandbox_backend}'. Execution refused."
-    )
-
-
-def docker_daemon_available() -> bool:
-    try:
-        completed = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            text=True,
-            timeout=8,
+    if approval_class:
+        result = _unavailable(
+            "File and network operations are not executed. "
+            "This runner only runs policy-allow code."
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return completed.returncode == 0
-
-
-def _run_docker(
-    code: str, tests: str, settings: Settings, approval_class: bool
-) -> ExecutionResult:
-    if not docker_daemon_available():
-        logger.info("sandbox_unavailable backend=docker reason=daemon")
-        return _unavailable(
-            "Docker daemon is not available. Execution was not attempted. "
-            "Start Docker and build the image with: "
-            "docker build -t codeforge-sandbox:latest docker/sandbox"
-        )
-    workspace = Path(tempfile.mkdtemp(prefix="codeforge_exec_"))
-    try:
-        (workspace / "solution.py").write_text(code, encoding="utf-8")
-        (workspace / "test_solution.py").write_text(tests, encoding="utf-8")
-        command = [
-            "docker",
-            "run",
-            "--rm",
-            "--network",
-            "none",
-            "--read-only",
-            "--cap-drop",
-            "ALL",
-            "--security-opt",
-            "no-new-privileges",
-            "--memory",
-            f"{settings.sandbox_memory_mb}m",
-            "--cpus",
-            str(settings.sandbox_cpu_limit),
-            "--pids-limit",
-            str(settings.sandbox_pids_limit),
-            "--tmpfs",
-            "/tmp:rw,noexec,nosuid,size=64m",
-            "-v",
-            f"{workspace}:/work:rw",
-            "-w",
-            "/work",
-            "--env",
-            "PYTHONDONTWRITEBYTECODE=1",
-            settings.sandbox_image,
-            "python",
-            "-m",
-            "pytest",
-            "-q",
-            "test_solution.py",
-            "--tb=line",
-            "-p",
-            "no:cacheprovider",
-        ]
-        logger.info(
-            "sandbox_start backend=docker image=%s timeout=%s approval_class=%s",
-            settings.sandbox_image,
-            settings.sandbox_timeout_seconds,
-            approval_class,
-        )
-        return _run_command(
-            command,
-            cwd=None,
-            env=None,
-            settings=settings,
-            backend="docker",
-            network_isolated=True,
-            filesystem_isolated=True,
-        )
-    finally:
-        shutil.rmtree(workspace, ignore_errors=True)
+    else:
+        result = _run_restricted_process(code, tests, settings)
+    # Always persist the gate outcome — callers (especially templates) previously
+    # left this None on successful allow runs, so the UI showed "not evaluated".
+    result.policy_decision = policy.decision
+    result.policy_reasons = list(policy.reasons or [])
+    return result
 
 
 def _run_restricted_process(code: str, tests: str, settings: Settings) -> ExecutionResult:
@@ -235,28 +147,6 @@ def _run_command(
     total = passed + failed + skipped
     stdout = _clip(stdout_full, settings.sandbox_max_output_bytes)
     stderr = _clip(stderr_full, settings.sandbox_max_output_bytes)
-    if (
-        backend == "docker"
-        and completed.returncode != 0
-        and total == 0
-    ):
-        detail = (stderr_full or stdout_full or "Docker did not run pytest.").strip()
-        logger.info("sandbox_unavailable backend=docker exit=%s", completed.returncode)
-        return ExecutionResult(
-            status="unavailable",
-            exit_code=completed.returncode,
-            stdout=_clip(stdout_full, settings.sandbox_max_output_bytes),
-            stderr=_clip(stderr_full, settings.sandbox_max_output_bytes),
-            execution_time_seconds=round(elapsed, 3),
-            error_message=(
-                "Docker sandbox did not start pytest. Code was not treated as executed. "
-                + detail[:500]
-            ),
-            sandbox_backend="docker",
-            network_isolated=None,
-            filesystem_isolated=None,
-            executed=False,
-        )
     if completed.returncode == 0 and total > 0:
         status, message = "passed", None
     elif completed.returncode == 1:

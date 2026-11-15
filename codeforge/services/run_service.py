@@ -192,16 +192,28 @@ def submit_code_request(request_text: str, conversation_id: str | None = None) -
         "two_negative",
     }
 
-    # 4. Verified template or the CodeForge pipeline. Templates still use R2.
+    # 4. Request-level refuse for wipe-home intents, then templates / pipeline.
     started = time.monotonic()
+    from codeforge.execution.request_guard import assess_request
     from codeforge.resilience.errors import AllProvidersFailed
     from codeforge.templates.library import match_template
     from codeforge.templates.runner import run_template
 
-    template = None if skip_pipeline else match_template(sanitized)
+    request_guard = assess_request(sanitized)
+    template = None if skip_pipeline or request_guard.denied else match_template(sanitized)
     provider_down = False
     if skip_pipeline:
         state = {"report": None}
+    elif request_guard.denied:
+        state = {
+            "report": None,
+            "request_denied": True,
+            "policy_result": {
+                "decision": "deny",
+                "reasons": list(request_guard.reasons),
+                "detected_operations": ["request:wipe_home"],
+            },
+        }
     elif template is not None:
         state = run_template(sanitized, template)
     else:
@@ -271,6 +283,21 @@ def submit_code_request(request_text: str, conversation_id: str | None = None) -
             "execution_successful": False,
             "tests_passed": False,
             "executed": False,
+        }
+    elif state.get("request_denied"):
+        status = "denied"
+        policy = state.get("policy_result") or {}
+        reasons = list(policy.get("reasons") or [])
+        artifacts = {
+            "status_detail": reasons[0] if reasons else "Blocked by CodeForge security policy.",
+            "generation_successful": False,
+            "execution_successful": False,
+            "tests_passed": False,
+            "executed": False,
+            "policy_decision": "deny",
+            "policy_reasons": reasons,
+            "operations": list(policy.get("detected_operations") or []),
+            "error_message": reasons[0] if reasons else "Blocked by policy.",
         }
     elif report is not None:
         status = report.status

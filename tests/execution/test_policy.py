@@ -30,6 +30,7 @@ DENY_SAMPLES = {
     "subprocess": "import subprocess\n\ndef run():\n    subprocess.run(['echo', 'hi'])\n",
     "rmtree": "import shutil\n\ndef wipe():\n    shutil.rmtree('/tmp/somewhere')\n",
     "remove": "import os\n\ndef wipe(path):\n    os.remove(path)\n",
+    "path_unlink": "from pathlib import Path\n\ndef wipe(path):\n    Path(path).unlink()\n",
     "eval": "def run(text):\n    return eval(text)\n",
     "exec": "def run(text):\n    exec(text)\n",
     "importlib": "import importlib\n\ndef load(name):\n    return importlib.import_module(name)\n",

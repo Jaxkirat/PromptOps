@@ -184,7 +184,8 @@ def get_settings() -> Settings:
             or "http://127.0.0.1:8000"
         ).rstrip("/"),
         invite_expiry_hours=_int_env("INVITE_EXPIRY_HOURS", 72),
-        sandbox_backend=os.getenv("CODEFORGE_SANDBOX_BACKEND", "docker").strip() or "docker",
+        sandbox_backend=os.getenv("CODEFORGE_SANDBOX_BACKEND", "restricted-process").strip()
+        or "restricted-process",
         sandbox_image=os.getenv("CODEFORGE_SANDBOX_IMAGE", "codeforge-sandbox:latest").strip()
         or "codeforge-sandbox:latest",
         sandbox_timeout_seconds=_int_env("CODEFORGE_SANDBOX_TIMEOUT_SECONDS", 10),

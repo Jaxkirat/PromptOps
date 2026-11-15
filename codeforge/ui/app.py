@@ -14,7 +14,6 @@ from codeforge.ui.formatters import (
     profile_html,
     quota_html,
     requirements_markdown,
-    roadmap_html,
     tests_summary_markdown,
 )
 from codeforge.ui.handlers import (
@@ -153,7 +152,6 @@ def build_interface() -> gr.Blocks:
                         info="Your runs only — never another user's.",
                     )
                     quota_panel = gr.HTML(quota_html(None))
-                    gr.HTML(roadmap_html())
                     instructor_panel = gr.Column(visible=False)
                     with instructor_panel:
                         gr.Markdown(instructor_sql_notice())

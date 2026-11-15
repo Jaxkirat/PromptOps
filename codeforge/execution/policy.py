@@ -71,6 +71,8 @@ _DENY_CALLS = {
     "os.spawnvp",
     "os._exit",
     "shutil.rmtree",
+    "pathlib.Path.unlink",
+    "pathlib.Path.rmdir",
     "subprocess.run",
     "subprocess.call",
     "subprocess.check_call",
@@ -279,6 +281,11 @@ class _PolicyVisitor(ast.NodeVisitor):
             self._deny(f"Call '{canonical}' is denied.")
             return
         if canonical in {"os.remove", "os.unlink", "os.rmdir", "os.removedirs", "shutil.rmtree"}:
+            self._deny(f"Call '{canonical}' is denied.")
+            return
+        # Path.unlink / bare unlink from an unresolved receiver — same class as os.remove.
+        leaf = canonical.rsplit(".", 1)[-1]
+        if leaf in {"unlink", "rmdir"} or canonical.endswith(".unlink") or canonical.endswith(".rmdir"):
             self._deny(f"Call '{canonical}' is denied.")
             return
         if (

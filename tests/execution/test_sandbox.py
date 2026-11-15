@@ -1,17 +1,14 @@
-"""Sandbox backend tests.
+"""Local pytest runner tests.
 
-restricted-process is an explicit opt-in used here for allow-class code.
-It must not be described as network isolation. Docker failures fail closed.
+Allow-class code runs in a temp directory with a timeout. It must not be
+described as network isolation. File and network code is refused.
 """
 
 import os
 
-import pytest
-
 from codeforge.config.settings import Settings, get_settings
 from codeforge.execution.models import PolicyResult
-from codeforge.execution.runner import PytestRunner
-from codeforge.execution.sandbox import docker_daemon_available, run_sandbox
+from codeforge.execution.sandbox import run_sandbox
 
 ALLOW = PolicyResult(decision="allow", reasons=["safe"])
 APPROVAL = PolicyResult(decision="needs_approval", reasons=["open"])
@@ -36,6 +33,8 @@ def test_valid_pytest_passes():
     assert result.executed is True
     assert result.network_isolated is False
     assert result.sandbox_backend == "restricted-process"
+    assert result.policy_decision == "allow"
+    assert result.policy_reasons == ["safe"]
 
 
 def test_failing_pytest_is_not_success():
@@ -89,33 +88,16 @@ def test_output_is_truncated():
     assert "truncated" in result.stdout
 
 
-def test_approval_class_is_refused_without_docker_isolation():
+def test_approval_class_is_refused():
     result = run_sandbox("def read():\n    return open('a').read()\n", "def test_x():\n    assert True\n", APPROVAL, approved=True)
     assert result.status == "unavailable"
     assert result.executed is False
+    assert result.policy_decision == "needs_approval"
+    assert result.policy_reasons == ["open"]
 
 
-def test_docker_backend_fails_closed_without_calling_pytest_runner(monkeypatch):
-    monkeypatch.setenv("CODEFORGE_SANDBOX_BACKEND", "docker")
-    from codeforge.config.settings import get_settings
-
-    get_settings.cache_clear()
-    called = {"runner": False}
-
-    def boom(*_args, **_kwargs):
-        called["runner"] = True
-        raise AssertionError("PytestRunner must not be used")
-
-    monkeypatch.setattr(PytestRunner, "run", boom)
-    if docker_daemon_available():
-        pytest.skip("Docker daemon is available; fail-closed is covered when it is not.")
-    result = run_sandbox(PASSING, PASSING_TESTS, ALLOW, settings=_settings(sandbox_backend="docker"))
-    assert result.status == "unavailable"
-    assert result.executed is False
-    assert called["runner"] is False
-
-
-def test_unknown_backend_fails_closed():
+def test_backend_name_does_not_select_another_runner():
     result = run_sandbox(PASSING, PASSING_TESTS, ALLOW, settings=_settings(sandbox_backend="nope"))
-    assert result.status == "unavailable"
-    assert result.executed is False
+    assert result.status == "passed"
+    assert result.executed is True
+    assert result.network_isolated is False

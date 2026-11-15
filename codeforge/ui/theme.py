@@ -156,23 +156,6 @@ button.primary, .primary-btn button {
 }
 .quota-reset { color: var(--cf-muted); font-size: 11px; margin-top: 6px; }
 
-.roadmap { padding: 8px 4px 4px; }
-.roadmap-title {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--cf-muted); margin-bottom: 8px;
-}
-.roadmap-item {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 12.5px; padding: 5px 0; color: var(--cf-text);
-}
-.roadmap-item.next { color: var(--cf-muted); }
-.roadmap-item .tag {
-  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
-  padding: 2px 7px; border-radius: 99px; border: 1px solid var(--cf-border);
-  color: var(--cf-muted);
-}
-.roadmap-item.live .tag { color: var(--cf-ok); border-color: #16351f; }
-
 .profile {
   display: flex; gap: 10px; align-items: center; padding: 10px 4px 6px;
   border-top: 1px solid var(--cf-border); margin-top: 8px;

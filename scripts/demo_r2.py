@@ -23,7 +23,6 @@ from codeforge.auth.identity import AuthenticatedPrincipal, principal_context
 from codeforge.config.settings import get_settings
 from codeforge.database.database import init_db
 from codeforge.exceptions import ApprovalNotFoundError
-from codeforge.execution.sandbox import docker_daemon_available
 from codeforge.graph.workflow import run_codeforge
 from codeforge.models.schemas import CodeOutput, RequirementsOutput, RouterOutput, TestOutput
 from codeforge.services.approval_service import create_approval, decide
@@ -66,9 +65,7 @@ def check(name: str, ok: bool, detail: str) -> bool:
 def main() -> None:
     init_db()
     settings = replace(get_settings(), sandbox_backend="restricted-process", sandbox_timeout_seconds=3)
-    docker_up = docker_daemon_available()
-    print(f"Docker daemon available: {docker_up}")
-    print("Demos 1-6 use restricted-process. network_isolated must stay false.")
+    print("Demos use the local pytest runner. network_isolated must stay false.")
     results: list[bool] = []
 
     safe_code = "def solution(a, b):\n    return a + b\n"
@@ -186,26 +183,8 @@ def main() -> None:
         hidden = True
     results.append(check("7 cross-user", hidden and not opened.exists(), "foreign student cannot decide"))
 
-    docker_settings = replace(get_settings(), sandbox_backend="docker", sandbox_timeout_seconds=10)
-    unavailable = run_codeforge("add", llm=llm(safe_code, safe_tests), settings=docker_settings)
-    execution = unavailable["report"].execution
-    if docker_up:
-        detail = (
-            f"daemon is up; status={unavailable['report'].status} "
-            f"backend={execution.sandbox_backend} executed={execution.executed} "
-            "network isolation was not probed from this script"
-        )
-        ok = execution.sandbox_backend == "docker" and (
-            (execution.executed and execution.network_isolated is True) or execution.status == "unavailable"
-        )
-    else:
-        detail = "Docker daemon is down. Safe code was not executed and PytestRunner was not used."
-        ok = unavailable["report"].status == "unavailable" and execution.executed is False
-    results.append(check("8 sandbox unavailable or docker", ok, detail))
-
     print()
     print(f"{sum(results)}/{len(results)} demonstrations passed")
-    print("UNVERIFIED: container network isolation (--network none) was not observed in a running container.")
     if not all(results):
         raise SystemExit(1)
 

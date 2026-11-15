@@ -44,6 +44,7 @@ def test_repairs_and_denials_are_scoped_by_the_caller():
 def test_keyword_triage_matches_the_examples():
     assert triage_text("I want to talk to an instructor.").wants_human is True
     assert triage_text("this is unacceptable").sentiment == "angry"
+    assert triage_text("WHY IS THIS CODE NOT WORKING!!!").sentiment == "angry"
     assert triage_text("This isn't quite what I expected.").sentiment == "negative"
     assert triage_text("please add a function").sentiment == "neutral"
     assert triage_text("please add a function").wants_human is False

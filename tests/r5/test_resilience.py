@@ -69,6 +69,7 @@ def test_template_really_runs_in_the_sandbox():
     assert state["report"].status == "success"
     assert state["report"].tests_passed is True
     assert state["report"].execution.executed is True
+    assert state["report"].execution.policy_decision == "allow"
 
 
 def test_template_hit_uses_the_sandbox(monkeypatch):
